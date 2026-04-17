@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"
 
     # Rate limiting
-    rate_limit_per_minute: int = 10
+    rate_limit_per_minute: int = 3
+
+    # Answer length limit (words)
+    max_answer_words: int = 80
 
     # Budget
     monthly_budget_usd: float = 10.0

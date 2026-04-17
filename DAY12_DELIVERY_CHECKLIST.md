@@ -1,8 +1,8 @@
 #  Delivery Checklist — Day 12 Lab Submission
 
-> **Student Name:** _________________________  
-> **Student ID:** _________________________  
-> **Date:** _________________________
+> **Student Name:** Nguyễn Lê Trung  
+> **Student ID:** 2A202600174  
+> **Date:** 17/4/2026
 
 ---
 
@@ -45,7 +45,7 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
 ## Part 3: Cloud Deployment
 
 ### Exercise 3.1: Railway deployment
-- URL: https://your-app.railway.app
+- URL: stellar-serenity-production-89a4.up.railway.app
 - Screenshot: [Link to screenshot in repo]
 
 ## Part 4: API Security
@@ -108,7 +108,7 @@ Create a file `DEPLOYMENT.md` with your deployed service information:
 # Deployment Information
 
 ## Public URL
-https://your-agent.railway.app
+https://2a202600174nguyenletrung-production.up.railway.app
 
 ## Platform
 Railway / Render / Cloud Run
@@ -162,14 +162,14 @@ Before submitting, verify your deployment:
 
 ```bash
 # 1. Health check
-curl https://your-app.railway.app/health
+curl https://2a202600174nguyenletrung-production.up.railway.app/health
 
 # 2. Authentication required
-curl https://your-app.railway.app/ask
+curl https://2a202600174nguyenletrung-production.up.railway.app/ask
 # Should return 401
 
 # 3. With API key works
-curl -H "X-API-Key: YOUR_KEY" https://your-app.railway.app/ask \
+curl -H "X-API-Key: YOUR_KEY" https://2a202600174nguyenletrung-production.up.railway.app/ask \
   -X POST -d '{"user_id":"test","question":"Hello"}'
 # Should return 200
 

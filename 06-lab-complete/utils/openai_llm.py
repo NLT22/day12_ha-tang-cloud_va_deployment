@@ -21,7 +21,7 @@ def ask(question: str, history: list[dict] | None = None,
     client = get_client(api_key)
 
     messages = [
-        {"role": "system", "content": "You are a helpful AI assistant."}
+        {"role": "system", "content": "You are a helpful AI assistant. Keep answers concise and under 80 words."}
     ]
     if history:
         for msg in history[-10:]:  # giữ 10 messages gần nhất để tránh vượt context
@@ -32,7 +32,7 @@ def ask(question: str, history: list[dict] | None = None,
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=512,
+        max_tokens=100,
         temperature=0.7,
     )
     return response.choices[0].message.content

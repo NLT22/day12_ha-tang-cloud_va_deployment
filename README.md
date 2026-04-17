@@ -2,7 +2,7 @@
 
 > **Student:** Nguyễn Lê Trung  
 > **Student ID:** 2A202600174   
-> **Deployed:** https://2a202600174nguyenletrung-production.up.railway.app
+> **Deployed:** https://2a202600174nguyenletrung-production.up.railway.app/ui
 
 ---
 

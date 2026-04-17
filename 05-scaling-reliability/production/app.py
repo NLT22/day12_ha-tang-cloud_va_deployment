@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -38,11 +38,11 @@ try:
     _redis = redis.from_url(REDIS_URL, decode_responses=True)
     _redis.ping()
     USE_REDIS = True
-    print("✅ Connected to Redis")
+    print("Connected to Redis")
 except Exception:
     USE_REDIS = False
     _memory_store: dict = {}
-    print("⚠️  Redis not available — using in-memory store (not scalable!)")
+    print("Redis not available; using in-memory store (not scalable!)")
 
 
 logging.basicConfig(level=logging.INFO)
@@ -93,7 +93,7 @@ def append_to_history(session_id: str, role: str, content: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting instance {INSTANCE_ID}")
-    logger.info(f"Storage: {'Redis ✅' if USE_REDIS else 'In-memory ⚠️'}")
+    logger.info(f"Storage: {'Redis' if USE_REDIS else 'In-memory'}")
     yield
     logger.info(f"Instance {INSTANCE_ID} shutting down")
 
@@ -125,6 +125,7 @@ class ChatRequest(BaseModel):
 # Endpoints
 # ──────────────────────────────────────────────────────────
 
+@app.post("/ask")
 @app.post("/chat")
 async def chat(body: ChatRequest):
     """

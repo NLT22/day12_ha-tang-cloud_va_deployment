@@ -107,10 +107,10 @@ python app.py
 
 | Feature | Basic | Advanced | Tại sao quan trọng? |
 |---------|-------|----------|---------------------|
-| Config | Hardcode | Env vars | ... |
-| Health check |  |  | ... |
-| Logging | print() | JSON | ... |
-| Shutdown | Đột ngột | Graceful | ... |
+| Config | Hardcode | Env vars | Giúp không lộ secret/API key trong code, dễ đổi cấu hình giữa local, staging, production mà không cần sửa source code. |
+| Health check |  |  | Cloud platform/load balancer biết app còn sống và sẵn sàng nhận request hay chưa; nếu lỗi có thể tự restart hoặc ngừng route traffic vào app. |
+| Logging | print() | JSON | Log dạng JSON dễ search, filter, parse bằng hệ thống như Datadog/Loki/Cloud Logs; tránh log secret và dễ debug production hơn. |
+| Shutdown | Đột ngột | Graceful | Khi platform tắt/redeploy container, app có thời gian hoàn tất request đang chạy và cleanup tài nguyên, giảm lỗi mất request hoặc hỏng kết nối. |
 
 ###  Checkpoint 1
 
@@ -144,10 +144,16 @@ cd ../../02-docker/develop
 **Nhiệm vụ:** Đọc `Dockerfile` và trả lời:
 
 1. Base image là gì?
+> Base image là image nền dùng để xây Docker image của mình, ở đây container sẽ có sẵn Python 3.11 và các công cụ cần thiết để chạy app Python.
 2. Working directory là gì?
+> Working directory là thư mục làm việc mặc định bên trong container. `WORKDIR /app` nghĩa là từ sau dòng này, các lệnh như COPY, RUN, CMD sẽ chạy trong thư mục /app. Ví dụ `COPY app.py .` sẽ copy app.py vào `/app/app.py`
 3. Tại sao COPY requirements.txt trước?
+> Để tận dụng Docker layer cache. Dependencies thường ít thay đổi hơn code. Nếu chỉ sửa app.py, Docker không cần chạy lại pip install, vì layer cài thư viện vẫn được cache. Build sẽ nhanh hơn nhiều. Nếu copy toàn bộ source code trước rồi mới pip install, chỉ cần sửa một dòng code cũng có thể làm Docker phải cài lại toàn bộ dependencies.
 4. CMD vs ENTRYPOINT khác nhau thế nào?
-
+> CMD là lệnh mặc định chạy khi container start. Nếu `CMD ["python", "app.py"]` thì khi chạy `docker run my-agent`, Docker sẽ chạy `python app.py`. Nhưng CMD dễ bị override, ví dụ
+`docker run my-agent bash` thì sẽ chạy bash thay cho CMD. ENTRYPOINT giống như lệnh chính cố định của container. Nó khó bị thay thế hơn, thường dùng khi image được thiết kế để luôn chạy một chương trình cụ thể. Ví dụ `ENTRYPOINT ["python"] 
+CMD ["app.py"]` khi chạy docker nó sẽ chạy `python app.py` còn 
+`docker run my-agent script.py` sẽ thành 'python script.py'.
 ###  Exercise 2.2: Build và run
 
 ```bash
@@ -167,6 +173,8 @@ curl http://localhost:8000/ask -X POST \
 ```bash
 docker images my-agent:develop
 ```
+> DISK USAGE: 1.66GB
+> CONTENT SIZE: 424MB
 
 ###  Exercise 2.3: Multi-stage build
 
@@ -176,8 +184,11 @@ cd ../production
 
 **Nhiệm vụ:** Đọc `Dockerfile` và tìm:
 - Stage 1 làm gì?
+> Nhiệm vụ của stage này là chuẩn bị môi trường để build/cài dependencies. Stage này chỉ dùng để build/cài thư viện, không phải image cuối để deploy.
 - Stage 2 làm gì?
+> Nhiệm vụ của stage này là tạo image cuối cùng để chạy app trong production.
 - Tại sao image nhỏ hơn?
+> Image nhỏ hơn vì Dockerfile dùng multi-stage build. Stage 1 có nhiều thứ nặng chỉ cần lúc build, những thứ này không được đưa sang image cuối. Stage 2 chỉ copy phần cần để chạy app, nó không copy toàn bộ builder image, không giữ compiler/build tools, nên image cuối nhẹ hơn, sạch hơn và an toàn hơn.
 
 Build và so sánh:
 ```bash
@@ -185,15 +196,58 @@ docker build -t my-agent:advanced .
 docker images | grep my-agent
 ```
 
+> DISK USAGE: 236MB
+> CONTENT SIZE: 56.6MB
+
 ###  Exercise 2.4: Docker Compose stack
 
 **Nhiệm vụ:** Đọc `docker-compose.yml` và vẽ architecture diagram.
+
+```
+                         User / Browser / Client
+                                  |
+                                  |
+                           HTTP :80 / HTTPS :443
+                                  |
+                                  v
+                    +-----------------------------+
+                    |            nginx            |
+                    | Reverse proxy / Load balancer|
+                    | image: nginx:alpine         |
+                    | ports: 80:80, 443:443       |
+                    +--------------+--------------+
+                                   |
+                                   | internal network
+                                   v
+                    +-----------------------------+
+                    |            agent            |
+                    | FastAPI AI Agent            |
+                    | build: Dockerfile runtime   |
+                    | PORT=8000                   |
+                    | /health healthcheck         |
+                    +------+----------------------+
+                           |
+             +-------------+-------------+
+             |                           |
+             | REDIS_URL                 | QDRANT_URL
+             v                           v
++-----------------------------+   +-----------------------------+
+|            redis            |   |            qdrant           |
+| Session cache               |   | Vector database             |
+| Rate limiting               |   | RAG storage/search          |
+| image: redis:7-alpine       |   | image: qdrant/qdrant:v1.9.0 |
+| volume: redis_data:/data    |   | volume: qdrant_data:/...    |
++-----------------------------+   +-----------------------------+
+```
+
+
 
 ```bash
 docker compose up
 ```
 
 Services nào được start? Chúng communicate thế nào?
+> Khi chạy docker compose up, Compose sẽ start các service: nginx, agent, redis, và qdrant. Trong đó nginx là reverse proxy/load balancer nhận request từ bên ngoài, agent là FastAPI app xử lý API, redis dùng cho cache/session/rate limiting, còn qdrant là vector database phục vụ RAG. Các service giao tiếp với nhau qua Docker network nội bộ tên internal. User gửi request vào nginx qua localhost:80 hoặc 443, sau đó nginx chuyển request đến agent ở port 8000. Từ agent, app gọi Redis bằng hostname redis:6379 và gọi Qdrant bằng hostname qdrant:6333. Chỉ nginx mở port ra ngoài, còn agent, redis, qdrant nằm trong mạng nội bộ nên an toàn hơn.
 
 Test:
 ```bash
@@ -300,6 +354,7 @@ cd ../render
 7. Deploy!
 
 **Nhiệm vụ:** So sánh `render.yaml` với `railway.toml`. Khác nhau gì?
+> railway.toml là config đơn giản cho một app chạy trên Railway. Nó chủ yếu khai báo cách build bằng Nixpacks, lệnh start app, health check /health, timeout và policy restart khi app lỗi. Các biến môi trường như OPENAI_API_KEY, ENVIRONMENT sẽ được set riêng qua Railway Dashboard hoặc Railway CLI. `render.yaml` chi tiết hơn và giống Infrastructure as Code hơn. Nó khai báo hẳn service web ai-agent, runtime Python, region singapore, plan free, build command, start command, health check, auto deploy khi push GitHub, và cả envVars. Ngoài web service, nó còn khai báo thêm Redis service agent-cache. Tóm lại, `railway.toml` tập trung vào cách build/deploy một service trên Railway, còn `render.yaml` mô tả toàn bộ hạ tầng trên Render rõ hơn: web app, biến môi trường, region, plan, auto deploy và Redis add-on.
 
 ###  Exercise 3.3: (Optional) GCP Cloud Run (15 phút)
 
@@ -339,8 +394,11 @@ cd ../../04-api-gateway/develop
 
 **Nhiệm vụ:** Đọc `app.py` và tìm:
 - API key được check ở đâu?
+> API key được check trong hàm verify_api_key(). Hàm này lấy giá trị từ header X-API-Key bằng APIKeyHeader, rồi được gắn vào endpoint /ask qua Depends(verify_api_key), nên ai gọi /ask đều phải có key hợp lệ.
 - Điều gì xảy ra nếu sai key?
+> Nếu không gửi key, API trả về lỗi 401 với message yêu cầu thêm header X-API-Key. Nếu có gửi key nhưng sai, API trả về lỗi 403 với message Invalid API key.
 - Làm sao rotate key?
+> Muốn rotate key thì đổi biến môi trường AGENT_API_KEY sang giá trị mới rồi restart app/container. Vì code đọc key bằng os.getenv("AGENT_API_KEY", ...), nên không cần sửa source code, chỉ cần cập nhật env var.
 
 Test:
 ```bash
@@ -372,7 +430,7 @@ python app.py
 
 curl http://localhost:8000/token -X POST \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "secret"}'
+  -d '{"username": "teacher", "password": "teach456"}'
 ```
 
 3. Dùng token để gọi API:
@@ -388,8 +446,11 @@ curl http://localhost:8000/ask -X POST \
 
 **Nhiệm vụ:** Đọc `rate_limiter.py` và trả lời:
 - Algorithm nào được dùng? (Token bucket? Sliding window?)
+> Code dùng thuật toán Sliding Window Counter. Mỗi user có một danh sách timestamp các request trong vòng 60 giây gần nhất. Mỗi lần có request mới, code xóa các timestamp đã quá cũ, rồi kiểm tra số request còn lại trong window. Nếu vượt quá giới hạn thì trả lỗi 429 Too Many Requests.
 - Limit là bao nhiêu requests/minute?
+> Limit mặc định cho user thường là 10 requests/phút, được tạo bằng: `rate_limiter_user = RateLimiter(max_requests=10, window_seconds=60)`. Còn admin có limit cao hơn là 100 requests/phút:`rate_limiter_admin = RateLimiter(max_requests=100, window_seconds=60)`
 - Làm sao bypass limit cho admin?
+> Admin không bypass hoàn toàn rate limit, mà được dùng rate limiter riêng với quota cao hơn. Trong app.py, nếu role là admin thì dùng rate_limiter_admin, còn user thường thì dùng rate_limiter_user. Muốn bypass thật sự cho admin thì có thể sửa logic để nếu role == "admin" thì bỏ qua bước limiter.check(...), nhưng code hiện tại chỉ tăng limit admin lên 100 req/phút.
 
 Test:
 ```bash

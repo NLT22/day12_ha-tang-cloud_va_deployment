@@ -19,6 +19,7 @@ Simulate shutdown:
     # Xem agent log graceful shutdown message
 """
 import os
+import sys
 import time
 import signal
 import logging
@@ -94,7 +95,7 @@ def root():
 async def ask_agent(question: str):
     if not _is_ready:
         raise HTTPException(503, "Agent not ready")
-    return {"answer": ask(question)}
+    return {"answer": ask(question, delay=10)}
 
 
 # ──────────────────────────────────────────────────────────
@@ -172,6 +173,25 @@ def ready():
 # GRACEFUL SHUTDOWN
 # ──────────────────────────────────────────────────────────
 
+def shutdown_handler(signum, frame):
+    """Handle SIGTERM from container orchestrator"""
+    global _is_ready
+
+    logger.info(f"Received signal {signum} — starting graceful shutdown")
+    _is_ready = False
+
+    deadline = time.time() + 30
+    while _in_flight_requests > 0 and time.time() < deadline:
+        logger.info(f"Waiting for {_in_flight_requests} in-flight requests...")
+        time.sleep(0.5)
+
+    if _in_flight_requests > 0:
+        logger.warning(f"Shutdown timeout with {_in_flight_requests} requests still in flight")
+
+    logger.info("Closing connections...")
+    logger.info("Shutdown complete")
+    sys.exit(0)
+
 def handle_sigterm(signum, frame):
     """
     SIGTERM là signal platform gửi khi muốn dừng container.
@@ -183,7 +203,7 @@ def handle_sigterm(signum, frame):
     logger.info(f"Received signal {signum} — uvicorn will handle graceful shutdown")
 
 
-signal.signal(signal.SIGTERM, handle_sigterm)
+signal.signal(signal.SIGTERM, shutdown_handler)
 signal.signal(signal.SIGINT, handle_sigterm)
 
 

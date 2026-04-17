@@ -107,7 +107,7 @@ Multi-stage build loại bỏ hoàn toàn compiler, build tools, và layer trung
 ### Exercise 3.1: Railway deployment
 
 - **URL:** `https://2a202600174nguyenletrung-production.up.railway.app`
-- **Screenshot:** ![](screenshots\3d130e28-ea84-455b-b312-b08597ba7536.jpg)
+- **Screenshot:** ![](screenshots/3d130e28-ea84-455b-b312-b08597ba7536.jpg)
 
 **Test commands:**
 ```bash

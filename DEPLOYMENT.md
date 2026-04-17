@@ -177,7 +177,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## Screenshots
 
-![](screenshots\0b81235f-c39b-4c99-85db-ef17b3aba977.jpg)
+![](screenshots/0b81235f-c39b-4c99-85db-ef17b3aba977.jpg)
 ---
 
 ## Deployment Steps (Railway CLI)
